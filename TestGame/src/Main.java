@@ -12,6 +12,7 @@ public class Main {
         BombRunner panel = new BombRunner(); // Replace with your image path
         frame.add(panel);
 
+
         // Make the frame visible
         frame.setVisible(true);
     }

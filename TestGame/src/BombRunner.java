@@ -1,49 +1,56 @@
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.*;
+import java.awt.geom.Ellipse2D;
 import java.util.ArrayList;
-import java.util.stream.IntStream;
 
 public class BombRunner extends JPanel implements KeyListener {
 
-    private Image image;
-    Character c = new Character();
-    private int xPos;
-    private int yPos;
-    private JLabel collisionLabel;
+    Character c = new Character(400,500);
+    private final Image image = c.getImage();
+
+    private final JLabel collisionLabel;
     private boolean gameOver;
     private ArrayList<Bomb> listB;
-    private Image backgroundImage;
+    private ArrayList<Ellipse2D> listOvals;
+    private final Image backgroundImage;
+    private Timer timer;
+    private Rectangle characterRect;
+    AudioGame audio = new AudioGame("res/gameAudio.wav");
 
 
     public BombRunner(){
-        this.image = c.getImage();
+
         this.backgroundImage = new ImageIcon("res/background.png").getImage();
-        this.xPos = 400;
-        this.yPos = 500;
         this.listB = new ArrayList<>();
+        this.listOvals = new ArrayList<>();
         this.gameOver = false;
         addKeyListener(this);
         setFocusable(true);
         this.collisionLabel = new JLabel("Collision Detected!");
+        collisionLabel.setForeground(Color.WHITE);
+        collisionLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         this.add(this.collisionLabel);
         this.collisionLabel.setVisible(false);
 
-        Timer timer =  new Timer(16, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
 
-                updateBombPosition();
-                checkCollision();
-                repaint();
+         this.timer =  new Timer(16, _ -> {
 
-            }
+             audio.play();
+             updateBombPosition();
+             checkCollision();
+             repaint();
 
-        });
+             if(gameOver){
+                 audio.stop();
+                 timer.stop();
+
+
+             }
+
+
+         });
         timer.start();
     }
 
@@ -53,69 +60,76 @@ public class BombRunner extends JPanel implements KeyListener {
                 int randomX = (int)(Math.random() * 601);
                 listB.get(i).setY(0);
                 listB.get(i).setX(randomX);
+
             }else {
                 int randomY = (int) (Math.random() * 5);
                 listB.get(i).setY(listB.get(i).getY() + randomY);
                 listB.get(i).setX(listB.get(i).getX());
             }
+
         }
 
     }
+
 
 
 
     public void pacManEffect(int xPos, int yPos){
         if(yPos > getHeight()){
-            this.yPos = 0;
+            c.setY(0);
         }
         if(yPos < 0){
-            this.yPos = getHeight();
+            c.setY(getHeight());
         }
 
         if(xPos > getWidth()){
-           this.xPos = 0;
+           c.setX(0);
         }
         if(xPos < 0){
-            this.xPos = getWidth();
+            c.setX(getWidth());
         }
     }
 
     public void checkCollision(){
-        Rectangle character = new Rectangle(this.xPos, this.yPos, 30, 60);
-
-        for (Bomb value : listB) {
-            Rectangle bomb = new Rectangle(value.getX(), value.getY(), 50, 50);
-
-            if (character.intersects(bomb) || bomb.intersects(character)) {
-                this.collisionLabel.setVisible(true);
-                this.gameOver = true;
+        for(Ellipse2D ovals: listOvals){
+            if(characterRect.intersects(ovals.getBounds2D())  || ovals.getBounds2D().intersects(characterRect)){
+                gameOver = true;
+                collisionLabel.setVisible(true);
                 break;
-            } else {
-                this.collisionLabel.setVisible(false);
-                this.gameOver = false;
+            }else{
+                gameOver = false;
+                collisionLabel.setVisible(false);
+
             }
-            repaint();
         }
-
-        repaint();
-
     }
 
     public void bombAdder(){
-        for(int i=0; i<10; i++){
+        for(int i=0; i<30; i++){
             int xRandom = (int)(Math.random()*601);
             Bomb b = new Bomb(xRandom,2);
             listB.add(b);
         }
     }
 
+
     public void paintComponent(Graphics g){
         super.paintComponent(g);
-        pacManEffect(this.xPos, this.yPos);
+        pacManEffect(c.getX(), c.getY());
         g.drawImage(backgroundImage, 0, 0, getWidth(),getHeight(), null);
-        g.drawImage(image, xPos, yPos, 30, 60, this);
+        g.drawImage(image, c.getX(), c.getY(), 30, 60, this);
+
+
+        characterRect = new Rectangle(c.getX()+9, c.getY()+5, 12, 55);
+        //g.drawRect(characterRect.x, characterRect.y, characterRect.width, characterRect.height);
+        listOvals.clear();
         bombAdder();
-        IntStream.range(0, 10).forEach(i -> g.drawImage(listB.get(i).getImage(), listB.get(i).getX(), listB.get(i).getY(), 50, 50, this));
+        for (int i = 0; i < 30; i++) {
+            g.drawImage(listB.get(i).getImage(), listB.get(i).getX(), listB.get(i).getY(), 50, 50, this);
+            Ellipse2D oval = new Ellipse2D.Double(listB.get(i).getX()+8, listB.get(i).getY()+15, 25, 25) ;
+            listOvals.add(oval);
+            //g.drawOval((int) oval.getX(), (int)oval.getY(), (int)oval.getWidth(),(int)oval.getHeight());
+        }
 
 
         repaint();
@@ -130,22 +144,34 @@ public class BombRunner extends JPanel implements KeyListener {
 
     }
 
-    @Override
-    public void keyPressed(KeyEvent e) {
-        int key = e.getKeyCode();
-        switch(key){
-            case KeyEvent.VK_LEFT: this.xPos-=10; break;
-            case KeyEvent.VK_RIGHT: this.xPos+=10; break;
-            case KeyEvent.VK_UP: this.yPos-=10; break;
-            case KeyEvent.VK_DOWN: this.yPos+=10; break;
+
+        @Override
+        public void keyPressed(KeyEvent e) {
+            int key = e.getKeyCode();
+            switch (key) {
+                case KeyEvent.VK_LEFT:
+                    c.setX(c.getX() - 10);
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    c.setX(c.getX() + 10);
+                    break;
+                case KeyEvent.VK_UP:
+                    c.setY(c.getY() - 10);
+                    break;
+                case KeyEvent.VK_DOWN:
+                    c.setY(c.getY() + 10);
+                    break;
+            }
+
+            if(gameOver){ removeKeyListener(this);}
+            repaint();
         }
 
-       checkCollision();
-        repaint();
-    }
 
     @Override
     public void keyReleased(KeyEvent e) {
 
     }
+
+
 }
